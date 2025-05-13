@@ -1,67 +1,110 @@
 import streamlit as st
-import pickle
-import numpy as np
+import joblib
 import pandas as pd
 
-#load the model and dataframe
-df = pd.read_csv("D:\downlode\df.csv")
-pipe = pickle.load(open("D:\downlode\pipe.pkl", "rb"))
+# Load the saved model
+model = joblib.load("laptop_price_predictor.pkl")
 
-st.title("💻Laptop Price Predictor")
+# Title
+st.title("💻 Laptop Price Predictor")
 
-#Now we will take user input one by one as per our dataframe
+# --- Input Features ---
 
-#Brand
-#company = st.selectbox('Brand', df['Company'].unique())
-company = st.selectbox('Brand', df['Company'].unique())
-#Type of laptop
-lap_type = st.selectbox("Type", df['TypeName'].unique())
+# Company
 
-#Ram
-ram = st.selectbox("Ram(in GB)", [2,4,6,8,12,16,24,32,64])
-#weight
-weight = st.number_input("Weight of the Laptop",min_value = 0.69,max_value= 4.7)
-#Touch screen
-touchscreen = st.selectbox("TouchScreen", ['No', 'Yes'])
-#IPS
-ips = st.selectbox("IPS", ['No', 'Yes'])
-#screen size
-screen_size = st.number_input('Screen Size')
+company = st.selectbox("Company", ['Dell', 'Lenovo', 'HP', 'Asus', 'Acer', 'MSI', 'Toshiba',
+                                   'Apple', 'Samsung', 'Mediacom', 'Microsoft', 'Others'])
 
-# resolution
-resolution = st.selectbox('Screen Resolution',['1920x1080','1366x768','1600x900','3840x2160','3200x1800','2880x1800','2560x1600','2560x1440','2304x1440'])
+# Type
+typename = st.selectbox("Laptop Type", ['Notebook', 'Gaming', 'Ultrabook',
+                                        '2 in 1 Convertible', 'Workstation', 'Netbook'])
 
-#cpu
-cpu = st.selectbox('CPU',df['Cpu_brand'].unique())
-hdd = st.selectbox('HDD(in GB)',[0,128,256,512,1024,2048])
-ssd = st.selectbox('SSD(in GB)',[0,8,128,256,512,1024])
-gpu = st.selectbox('GPU',df['Gpu_brand'].unique())
+# RAM
+ram = st.selectbox("RAM (GB)", [2, 4, 6, 8, 12, 16, 24, 32, 64])
+
+# OS
 if company == "Apple" :
-    os = st.selectbox("os",["Mac"])
+    os = st.selectbox("os",['macOS', 'Mac OS X'])
 
 if company != "Apple" :
-    os = st.selectbox('OS',["Windows","Others/No OS/Linux"])
-
-#Prediction
-if st.button('Price Prediction'):
-    ppi = None
-    if touchscreen == "Yes":
-        touchscreen = 1
-    else:
-        touchscreen = 0
-        
-    if ips == "Yes":
-        ips = 1
-    else:
-        ips = 0
-      
-    X_res = int(resolution.split('x')[0])
-    Y_res = int(resolution.split('x')[1])
-    ppi = ((X_res ** 2) + (Y_res**2)) ** 0.5 / screen_size
-
-    # making prediction 
-    query = np.array([company,lap_type,ram,weight,touchscreen,ips,ppi,cpu,hdd,ssd,gpu,os])
-    query = query.reshape(1, 12)
-    prediction = str(int(np.exp(pipe.predict(query)[0])))
-    st.title("The predicted price of this configuration is " + prediction)
     
+    os = st.selectbox("Operating System", ['Windows 10', 'Linux', 'Windows 7', 'Chrome OS',
+                                       'Windows 10 S', 'Android'])
+
+# Weight
+weight_cat = st.selectbox("Weight Category", ['Light', 'Middle', 'Heavy'])
+
+# Touchscreen and IPS
+touchscreen = st.checkbox("Touchscreen")
+ips = st.checkbox("IPS Display")
+
+# Screen Resolution
+res_options = {
+    "HD (1366x768)": (1366, 768),
+    "HD+ (1600x900)": (1600, 900),
+    "Full HD (1920x1080)": (1920, 1080),
+    "Full HD+ (1920x1200)": (1920, 1200),
+    "Retina (2304x1440)": (2304, 1440),
+    "Retina+ (2560x1440)": (2560, 1440),
+    "Retina WQXGA (2560x1600)": (2560, 1600),
+    "2K (2160x1440)": (2160, 1440),
+    "2.5K Touch (2256x1504)": (2256, 1504),
+    "Quad HD+ (3200x1800)": (3200, 1800),
+    "2.7K Surface Pro (2736x1824)": (2736, 1824),
+    "2.8K Retina (2880x1800)": (2880, 1800),
+    "4K Ultra HD (3840x2160)": (3840, 2160),
+    "WQXGA+ (2400x1600)": (2400, 1600)
+}
+
+screen_res = st.selectbox("Screen Resolution", list(res_options.keys()))
+resolution_width, resolution_height = res_options[screen_res]
+
+# Screen size is fixed at 15 inches (you can make it adjustable)
+screen_size = 15
+ppi = ((resolution_width**2 + resolution_height**2)**0.5) / screen_size
+
+# CPU
+cpu = st.selectbox("Processor", ['Intel Core i7', 'Intel Core i5', 'Intel Core i3',
+                                 'AMD Processor', 'Other Intel Processor'])
+
+# GPU
+gpu = st.selectbox("GPU", ['Intel', 'Nvidia', 'AMD'])
+
+# Storage options
+ssd = st.selectbox("SSD Size", ['None', '16GB', '32GB', '64GB', '128GB', '256GB', '512GB', '1TB'])
+hdd = st.selectbox("HDD Size", ['None', '32GB', '128GB', '512GB', '1TB', '2TB'])
+hybrid = st.selectbox("Hybrid Storage", ['None', '1TB', '508GB'])
+flash = st.selectbox("Flash Storage", ['None', '16GB', '32GB', '64GB', '128GB', '256GB', '512GB'])
+
+# --- Data Preprocessing ---
+def clean_storage(val):
+    if val == 'None':
+        return 0
+    elif 'TB' in val:
+        return int(val.replace('TB', '').strip()) * 1024
+    else:
+        return int(val.replace('GB', '').strip())
+
+input_dict = {
+    'Company': [company],
+    'TypeName': [typename],
+    'Ram': [ram],
+    'OpSys': [os],
+    'weight_category': [weight_cat],
+    'Touchscreen': [int(touchscreen)],
+    'IPS': [int(ips)],
+    'PPI': [round(ppi, 2)],
+    'Cpu_brand': [cpu],
+    'Gpu_brand': [gpu],
+    'SSD': [clean_storage(ssd)],
+    'HDD': [clean_storage(hdd)],
+    'Hybrid': [clean_storage(hybrid)],
+    'Flash': [clean_storage(flash)]
+}
+
+input_df = pd.DataFrame(input_dict)
+
+# --- Prediction ---
+if st.button("Predict Price"):
+    prediction = model.predict(input_df)
+    st.success(f"💰 Estimated Laptop Price: {round(prediction[0], 2)} EGP")
